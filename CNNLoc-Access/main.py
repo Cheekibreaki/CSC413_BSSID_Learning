@@ -28,9 +28,9 @@ rng=np.random.RandomState(888)
 
 base_dir= os.getcwd()
 # train_csv_path = os.path.join(base_dir,'trainingData.csv')
-test_csv_path=os.path.join(base_dir,'scanresult.csv')
-valid_csv_path=os.path.join(base_dir,'scanresult.csv')
-train_csv_path=os.path.join(base_dir,'scanresult.csv')
+test_csv_path=os.path.join(base_dir,'TestData.csv')
+valid_csv_path=os.path.join(base_dir,'ValidationData.csv')
+train_csv_path=os.path.join(base_dir,'TrainingData.csv')
 
 log_dir='New_access_log.txt'
 if __name__ == '__main__':
@@ -144,11 +144,25 @@ if __name__ == '__main__':
                 #     plt.savefig('pictures/all/'+save_picture_dir+'/bpde'+name+'LocationLoss.png')
                 #     plt.clf()
 
-                building_right, floor_right, longitude_error, latitude_error, mean_error=encode_dnn_model.error(test_x, test_y)
+                building_right, floor_right, longitude_error, latitude_error, longitude_std_dev, latitude_std_dev, mean_error = encode_dnn_model.error(
+                    test_x, test_y)
 
+
+                with open(log_dir, 'a') as file:
+                    file.write('\n test data')
+                    file.write('\nloss,opt,lr,b_hr,f_hr,pos_longi_err,pos_lati_err,longi_std,lati_std,mean_err,time')
+                    file.write(f"\n{loss},{opt},{lr},{(building_right / 31.0) * 100}%,{(floor_right / 31.0) * 100}%," +
+                               f"{longitude_error},{latitude_error},{longitude_std_dev},{latitude_std_dev},{mean_error}," +
+                               f"{end - strat}")
+
+                building_right, floor_right, longitude_error, latitude_error, longitude_std_dev, latitude_std_dev, mean_error = encode_dnn_model.error(
+                    valid_x, valid_y)
 
                 del encode_dnn_model
 
-                with open(log_dir,'a') as file:
-                    file.write('\nloss,opt,lr,b_hr,f_hr,pos_longi_err,pos_lati_err,mean_err,time')
-                    file.write('\n'+str(loss)+','+str(opt)+','+str(lr)+','+str((building_right/1111.0)*100)+'%,'+str((floor_right/1111.0)*100)+'%,'+str(longitude_error)+','+str(latitude_error)+','+str(mean_error)+','+str(end-strat))
+                with open(log_dir, 'a') as file:
+                    file.write('\n valid data')
+                    file.write('\nloss,opt,lr,b_hr,f_hr,pos_longi_err,pos_lati_err,longi_std,lati_std,mean_err,time')
+                    file.write(f"\n{loss},{opt},{lr},{(building_right / 52.0) * 100}%,{(floor_right / 52.0) * 100}%," +
+                               f"{longitude_error},{latitude_error},{longitude_std_dev},{latitude_std_dev},{mean_error}," +
+                               f"{end - strat}")

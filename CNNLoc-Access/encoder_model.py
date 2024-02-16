@@ -313,12 +313,28 @@ class EncoderDNN(object):
     def error(self, x, y):
         _y = self.predict(x)
         building_right = np.sum(np.equal(np.round(_y[0]), y[:, 3]))
-        floor_right=np.sum(np.equal(np.round(_y[1]),y[:,2]))
-        predict_long=np.reshape(_y[2],(1,len(_y[2])))
-        predict_lati=np.reshape(_y[3],(1,len(_y[3])))
-        longitude_error = np.mean(np.sqrt(np.square(predict_long - y[:, 0])))
-        latitude_error = np.mean(np.sqrt(np.square(predict_lati - y[:, 1])))
-        mean_error=np.mean(np.sqrt(np.square(predict_long - y[:, 0])+np.square(predict_lati - y[:, 1])))
-        return  building_right,floor_right,longitude_error,latitude_error,mean_error
+        floor_right = np.sum(np.equal(np.round(_y[1]), y[:, 2]))
+        predict_long = np.reshape(_y[2], (1, len(_y[2])))
+        predict_lati = np.reshape(_y[3], (1, len(_y[3])))
+        long_label = y[:, 0].reshape((1, -1))
+        latitude_label = y[:, 1].reshape((1, -1))
+
+        # Calculate the prediction errors for longitude and latitude
+        longitude_diff = np.square(predict_long - long_label)
+        latitude_diff = np.square(predict_lati - latitude_label)
+
+        # Calculate the mean error for longitude and latitude
+        longitude_error = np.mean(np.sqrt(longitude_diff))
+        latitude_error = np.mean(np.sqrt(latitude_diff))
+
+        # Calculate the standard deviation for longitude and latitude errors
+        longitude_std_dev = np.std(np.sqrt(longitude_diff))
+        latitude_std_dev = np.std(np.sqrt(latitude_diff))
+
+        # Calculate the combined mean error
+        mean_error = np.mean(np.sqrt(longitude_diff + latitude_diff))
+
+        # Return the results
+        return building_right, floor_right, longitude_error, latitude_error, longitude_std_dev, latitude_std_dev, mean_error
 
 
