@@ -198,11 +198,11 @@ class EncoderDNN(object):
             self.encoder_model.compile(
                 loss=self.loss,
                 optimizer=self.opt
-
             )
             h_AE=self.encoder_model.fit(self.normalize_x, self.normalize_x,validation_data=(self.normalize_valid_x,self.normalize_valid_x), epochs=self.epoch_AE,batch_size=66)#,callbacks=[early_stopping])
             self.bottleneck_model.save(os.path.join(AE_model_dir,('AE_bottleneck_'+self.AE_floor_bottleneck+'.h5')))
             self.encoder_model.save('AE_model/AE_'+self.AE_floor_bottleneck+'.h5')
+
 
 #################fit_Location
         if Train_Location:

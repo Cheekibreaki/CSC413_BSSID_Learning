@@ -4,7 +4,7 @@ import data_helper
 import time
 import keras
 import csv
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import os
 import tensorflow as tf
 from keras.optimizers import Adam,Adagrad,Adadelta,Nadam,Adamax,SGD,RMSprop
@@ -84,65 +84,6 @@ if __name__ == '__main__':
                 h=encode_dnn_model.fit(train_x, train_y, valid_x=valid_x, valid_y=valid_y)#,tensorbd=tbCallBack)
                 end=time.time()
                 trining_time=end-strat
-                # if not isinstance(h[0],int):
-                #
-                #     # Plot training & validation loss values
-                #     with open(log_dir,'a') as f:
-                #         f.write('\n\nSAE_training_log bpde'+name+'\n')
-                #         f.write('training loss:\t'+str(h[0].history['loss']))
-                #         f.write('\nvalid loss:\t'+str(h[0].history['val_loss']))
-                #     plt.plot(h[0].history['loss'])
-                #     plt.plot(h[0].history['val_loss'])
-                #     plt.title('SAE Model loss')
-                #     plt.ylabel('Loss')
-                #     plt.xlabel('Epoch')
-                #     plt.legend(['Train', 'Test'], loc='upper left')
-                #     plt.savefig('pictures/all/'+save_picture_dir+'/bpde'+name+'saeLoss.png')
-                #     plt.clf()
-                #
-                # if not isinstance(h[1],int):
-                #     # Plot training & validation accuracy values
-                #     with open(log_dir,'a') as f:
-                #         f.write('\n\ndropout rate='+name)
-                #         f.write('\n\nFloor_training_acc_log bpde'+name+'\n')
-                #         f.write('training acc:\n'+str(h[1].history['acc'])[1:-1])
-                #         f.write('\nvalid acc:\n'+str(h[1].history['val_acc'])[1:-1])
-                #     plt.plot(h[1].history['acc'])
-                #     plt.plot(h[1].history['val_acc'])
-                #     plt.title('Floor Model accuracy')
-                #     plt.ylabel('Accuracy')
-                #     plt.xlabel('Epoch')
-                #     plt.legend(['Train', 'Test'], loc='upper left')
-                #     plt.savefig('pictures/all/'+save_picture_dir+'/bpde'+name+'flooracc.png')
-                #     plt.clf()
-                #     # Plot training & validation loss values
-                #     with open(log_dir,'a') as f:
-                #         f.write('\n\nFloor_training_loss_log bpde'+name+'\n\n')
-                #         f.write('training loss:\n'+str(h[1].history['loss'])[1:-1])
-                #         f.write('\nvalid loss:\n'+str(h[1].history['val_loss'])[1:-1])
-                #     plt.plot(h[1].history['loss'])
-                #     plt.plot(h[1].history['val_loss'])
-                #     plt.title('Floor Model loss')
-                #     plt.ylabel('Loss')
-                #     plt.xlabel('Epoch')
-                #     plt.legend(['Train', 'Test'], loc='upper left')
-                #     plt.savefig('pictures/all/'+save_picture_dir+'/bpde'+name+'floorLoss.png')
-                #     plt.clf()
-                #
-                # if not isinstance(h[2], int):
-                #     # Plot training & validation loss values
-                #     with open(log_dir,'a') as f:
-                #         f.write('\n\nLocation_training_log bpde'+name+'\n\n')
-                #         f.write('training loss:\n'+str(h[2].history['loss'])[1:-1])
-                #         f.write('\nvalid loss:\n'+ str(h[2].history['val_loss'])[1:-1])
-                #     plt.plot(h[2].history['loss'])
-                #     plt.plot(h[2].history['val_loss'])
-                #     plt.title('Location Model loss')
-                #     plt.ylabel('Loss')
-                #     plt.xlabel('Epoch')
-                #     plt.legend(['Train', 'Test'], loc='upper left')
-                #     plt.savefig('pictures/all/'+save_picture_dir+'/bpde'+name+'LocationLoss.png')
-                #     plt.clf()
 
                 building_right, floor_right, longitude_error, latitude_error, longitude_std_dev, latitude_std_dev, mean_error = encode_dnn_model.error(
                     test_x, test_y)
