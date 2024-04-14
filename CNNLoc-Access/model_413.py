@@ -10,9 +10,9 @@ from sklearn.metrics import accuracy_score
 
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 from keras.backend.tensorflow_backend import set_session
-config=tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction=0.9
-set_session(tf.Session(config=config))
+# config=tf.ConfigProto()
+# config.gpu_options.per_process_gpu_memory_fraction=0.9
+# set_session(tf.Session(config=config))
 
 
 base_dir= os.getcwd()
@@ -48,16 +48,16 @@ class NN(object):
         self.normalize_valid_y= None
 
     def _preprocess(self, x, y, valid_x, valid_y):
-        self.normY = data_helper_413.NormY()
-        self.normalize_x = data_helper_413.normalizeX(x)
-        self.normalize_valid_x = data_helper_413.normalizeX(valid_x)
+        #self.normY = data_helper_413.NormY()
+        self.normalize_x = data_helper.normalizeX(x)
+        self.normalize_valid_x = data_helper.normalizeX(valid_x)
 
-        self.normY.fit(y[:, 0], y[:, 1])
-        self.longitude_normalize_y, self.latitude_normalize_y = self.normY.normalizeY(y[:, 0], y[:, 1])
+        data_helper.normY.fit(y[:, 0], y[:, 1])
+        self.longitude_normalize_y, self.latitude_normalize_y = data_helper.normY.normalizeY(y[:, 0], y[:, 1])
         self.floorID_y = y[:, 2]
         self.buildingID_y = y[:, 3]
 
-        self.longitude_normalize_valid_y, self.latitude_normalize_valid_y = self.normY.normalizeY(valid_y[:, 0],valid_y[:, 1])
+        self.longitude_normalize_valid_y, self.latitude_normalize_valid_y = data_helper.normY.normalizeY(valid_y[:, 0],valid_y[:, 1])
         self.floorID_valid_y = valid_y[:, 2]
         self.buildingID_valid_y = valid_y[:, 3]
 
@@ -78,7 +78,9 @@ class NN(object):
 
 
 if __name__ == '__main__':
-    (train_x, train_y), (valid_x, valid_y),(test_x,test_y) = data_helper_413.load_data_all(train_csv_path, valid_csv_path,test_csv_path)
+    data_helper = data_helper_413.DataHelper()
+    #data_helper.set_config(wap_size=589,long=589,lat=590,floor=591,building_id=592)
+    (train_x, train_y), (valid_x, valid_y),(test_x,test_y) = data_helper.load_data_all(train_csv_path, valid_csv_path,test_csv_path)
     (train_x,train_y) = filter_building(train_x,train_y,1)
     (valid_x, valid_y) = filter_building(valid_x, valid_y, 1)
     nn_model = NN()
