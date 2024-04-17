@@ -1,13 +1,20 @@
 from encoder_model import EncoderDNN
 import data_helper_413
 import os
-import tensorflow as tf
+from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 import numpy as np
+from torch.nn import BCEWithLogitsLoss
 from sklearn.metrics import accuracy_score
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.nn import CrossEntropyLoss
+import matplotlib.pyplot as plt
+import math
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 from keras.backend.tensorflow_backend import set_session
 # config=tf.ConfigProto()
@@ -38,14 +45,71 @@ def filter_building(x, y, building_id):
 
     return filtered_x, filtered_y
 
-
-class NN(object):
+class NN(nn.Module):
 
     def __init__(self):
+        super(NN, self).__init__()
+        self.WAP_SIZE = 520
+        self.LONGITUDE = 520
+        self.LATITUDE = 521
+        self.FLOOR = 522
+        self.BUILDINGID = 523
+        self.FLOOR_CLASSES = 4
+        self.EMBEDDING_SIZE = 6
         self.normalize_valid_x= None
         self.normalize_x= None
         self.normalize_y= None
         self.normalize_valid_y= None
+
+
+        self.num_heads = 3
+        self.head_dim = self.EMBEDDING_SIZE // self.num_heads
+        assert self.EMBEDDING_SIZE % self.num_heads == 0, "Embedding size must be divisible by num_heads"
+
+        self.embedding = nn.Embedding(self.WAP_SIZE, self.EMBEDDING_SIZE)
+        self.Wq = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wk = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wv = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wo = nn.Parameter(torch.randn(self.num_heads * self.head_dim, self.EMBEDDING_SIZE))
+
+        self.layer_norm1 = nn.LayerNorm(self.EMBEDDING_SIZE)  # Layer normalization after attention
+        self.layer_norm2 = nn.LayerNorm(self.EMBEDDING_SIZE)  # Layer normalization after the first FC layer
+
+        self.fc1 = nn.Linear(self.EMBEDDING_SIZE * self.WAP_SIZE, self.EMBEDDING_SIZE)  # First fully connected layer
+        self.fc2 = nn.Linear(self.EMBEDDING_SIZE, 4)
+
+    def forward(self, x):
+        indices = torch.arange(0, self.WAP_SIZE, dtype=torch.long, device=x.device)
+        embedded = self.embedding(indices)
+        x = x.unsqueeze(-1)  # Shape: [batch_size, WAP_SIZE, 1]
+        x = x.expand(-1, -1, self.EMBEDDING_SIZE)
+
+        Q = torch.matmul(x, self.Wq)
+        K = torch.matmul(x, self.Wk)
+        V = torch.matmul(x, self.Wv)
+
+        Q = Q.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        attn = F.softmax(scores, dim=-1)
+        context = torch.matmul(attn, V)
+
+        context = context.transpose(1, 2).contiguous().view(-1, self.WAP_SIZE, self.num_heads * self.head_dim)
+        output = torch.matmul(context, self.Wo)  # Final output projection
+
+        output = self.layer_norm1(output)  # Apply layer normalization after attention output
+
+        output = output.view(output.size(0), -1)
+        output = F.relu(self.fc1(output))  # Apply ReLU after the first fully connected layer
+
+        output = self.layer_norm2(output)  # Apply layer normalization after the first FC layer
+
+        output = self.fc2(output)
+        output = F.softmax(output, dim=-1)  # Apply softmax across the last dimension
+
+        return output
 
     def _preprocess(self, x, y, valid_x, valid_y):
         #self.normY = data_helper_413.NormY()
@@ -62,11 +126,7 @@ class NN(object):
         self.buildingID_valid_y = valid_y[:, 3]
 
 
-    def _knn_process(self):
-        knn = KNeighborsClassifier(n_neighbors=4)
 
-        # Train the classifier
-        knn.fit(self.normalize_x, self.floorID_y)
 
 from torch.nn import BCEWithLogitsLoss
 
@@ -121,11 +181,46 @@ def train_model(model, train_loader, val_loader, num_epochs, learning_rate):
 
 
 if __name__ == '__main__':
-    data_helper = data_helper_413.DataHelper()
-    #data_helper.set_config(wap_size=589,long=589,lat=590,floor=591,building_id=592)
-    (train_x, train_y), (valid_x, valid_y),(test_x,test_y) = data_helper.load_data_all(train_csv_path, valid_csv_path,test_csv_path)
-    (train_x,train_y) = filter_building(train_x,train_y,1)
-    (valid_x, valid_y) = filter_building(valid_x, valid_y, 1)
+    # Setup
+
+    num_epochs = 200
+    learning_rate = 0.000008
+
+    # Assuming data_helper functions and filter_building return appropriate numpy arrays
     nn_model = NN()
-    nn_model._preprocess(train_x[:2000],train_y[:2000],valid_x[:400],valid_y[:400])
-    nn_model._knn_process()
+    # nn_model.to(device)
+    data_helper = data_helper_413.DataHelper()
+    data_helper.set_config(wap_size=nn_model.WAP_SIZE, long=nn_model.LONGITUDE, lat=nn_model.LATITUDE, floor=nn_model.FLOOR,
+                           building_id=nn_model.BUILDINGID)
+    (train_x, train_y), (valid_x, valid_y), (test_x, test_y) = data_helper.load_data_all(train_csv_path, valid_csv_path,
+                                                                                         test_csv_path)
+    (train_x, train_y) = filter_building(train_x, train_y, 1)
+    (valid_x, valid_y) = filter_building(valid_x, valid_y, 1)
+
+    # Assuming train_x and train_y are numpy arrays, you need to convert them to tensors
+    train_x_tensor = torch.tensor(train_x, dtype=torch.float32)
+    train_y_tensor = torch.tensor(train_y[:, 2], dtype=torch.long)  # Assuming column 2 is the target
+
+    valid_x_tensor = torch.tensor(valid_x, dtype=torch.float32)
+    valid_y_tensor = torch.tensor(valid_y[:, 2], dtype=torch.long)  # Same assumption
+
+    # Create TensorDatasets and DataLoaders
+    train_dataset = TensorDataset(train_x_tensor, train_y_tensor)
+    valid_dataset = TensorDataset(valid_x_tensor, valid_y_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    val_loader = DataLoader(valid_dataset, batch_size=64)
+
+    # Train the model
+    trained_model, train_losses, val_losses, train_accs, val_accs = train_model(nn_model, train_loader, val_loader, num_epochs, learning_rate)
+
+
+
+
+
+
+
+
+
+
+
+
