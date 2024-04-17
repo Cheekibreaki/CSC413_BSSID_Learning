@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn import CrossEntropyLoss
 import matplotlib.pyplot as plt
-
+import math
 os.environ["CUDA_VISIBLE_DEVICES"]='0'
 from keras.backend.tensorflow_backend import set_session
 # config=tf.ConfigProto()
@@ -54,78 +54,62 @@ class NN(nn.Module):
         self.LATITUDE = 521
         self.FLOOR = 522
         self.BUILDINGID = 523
-        self.Floor_classes = 4
-
+        self.FLOOR_CLASSES = 4
+        self.EMBEDDING_SIZE = 6
         self.normalize_valid_x= None
         self.normalize_x= None
         self.normalize_y= None
         self.normalize_valid_y= None
 
-        self.weights = nn.Parameter(torch.randn(self.WAP_SIZE, self.WAP_SIZE)) # Assuming the input dimension is 100 and output is 4x100
-        self.fc1 = nn.Linear(self.WAP_SIZE, 260)  # First fully connected layer
-        self.fc2 = nn.Linear(260, self.Floor_classes)  # Output layer
+
+        self.num_heads = 3
+        self.head_dim = self.EMBEDDING_SIZE // self.num_heads
+        assert self.EMBEDDING_SIZE % self.num_heads == 0, "Embedding size must be divisible by num_heads"
+
+        self.embedding = nn.Embedding(self.WAP_SIZE, self.EMBEDDING_SIZE)
+        self.Wq = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wk = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wv = nn.Parameter(torch.randn(self.EMBEDDING_SIZE, self.EMBEDDING_SIZE))
+        self.Wo = nn.Parameter(torch.randn(self.num_heads * self.head_dim, self.EMBEDDING_SIZE))
+
+        self.layer_norm1 = nn.LayerNorm(self.EMBEDDING_SIZE)  # Layer normalization after attention
+        self.layer_norm2 = nn.LayerNorm(self.EMBEDDING_SIZE)  # Layer normalization after the first FC layer
+
+        self.fc1 = nn.Linear(self.EMBEDDING_SIZE * self.WAP_SIZE, self.EMBEDDING_SIZE)  # First fully connected layer
+        self.fc2 = nn.Linear(self.EMBEDDING_SIZE, 4)
+
     def forward(self, x):
-        # Apply a softmax to weights to simulate a stochastic matrix where each row sums to 1
-        # soft_permutation_matrix = F.softmax(self.weights, dim=1)
-        # Matrix multiplication to reorder x in a soft manner
-        #x = torch.matmul(soft_permutation_matrix, x.unsqueeze(-1)).squeeze(-1)
-        # Use ReLu
-        x = F.relu(self.fc1(x))  # Activation function after first fully connected layer
-        x = self.fc2(x)  # Activation function after second fully connected layer
+        indices = torch.arange(0, self.WAP_SIZE, dtype=torch.long, device=x.device)
+        embedded = self.embedding(indices)
+        x = x.unsqueeze(-1)  # Shape: [batch_size, WAP_SIZE, 1]
+        x = x.expand(-1, -1, self.EMBEDDING_SIZE)
 
-        #output = F.softmax(logits, dim=1)  # Applying softmax to get probabilities for each class
-        output = x
+        Q = torch.matmul(x, self.Wq)
+        K = torch.matmul(x, self.Wk)
+        V = torch.matmul(x, self.Wv)
+
+        Q = Q.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.view(-1, self.WAP_SIZE, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        attn = F.softmax(scores, dim=-1)
+        context = torch.matmul(attn, V)
+
+        context = context.transpose(1, 2).contiguous().view(-1, self.WAP_SIZE, self.num_heads * self.head_dim)
+        output = torch.matmul(context, self.Wo)  # Final output projection
+
+        output = self.layer_norm1(output)  # Apply layer normalization after attention output
+
+        output = output.view(output.size(0), -1)
+        output = F.relu(self.fc1(output))  # Apply ReLU after the first fully connected layer
+
+        output = self.layer_norm2(output)  # Apply layer normalization after the first FC layer
+
+        output = self.fc2(output)
+        output = F.softmax(output, dim=-1)  # Apply softmax across the last dimension
+
         return output
-
-    # def __init__(self):
-    #     super(NN, self).__init__()
-    #     self.WAP_SIZE = 520
-    #     self.LONGITUDE = 520
-    #     self.LATITUDE = 521
-    #     self.FLOOR = 522
-    #     self.BUILDINGID = 523
-    #     self.Floor_classes = 4
-    #
-    #     self.normalize_valid_x = None
-    #     self.normalize_x = None
-    #     self.normalize_y = None
-    #     self.normalize_valid_y = None
-    #
-    #     # Define the weights for the permutation matrix
-    #     self.weights = nn.Parameter(torch.randn(self.WAP_SIZE, self.WAP_SIZE))
-    #
-    #     # Convolutional layers
-    #
-    #     self.conv1 = nn.Conv2d(1, 1, kernel_size=(30, 4), padding=(1, 1), stride=(10, 1))
-    #
-    #     # Final fully connected layers
-    #     self.fc1 = nn.Linear(33,
-    #                          11)  # Adjust the input features depending on the output of the last conv layer
-    #     self.fc2 = nn.Linear(11, self.Floor_classes)
-    #
-    # def forward(self, x):
-    #     # Apply softmax to simulate a stochastic matrix where each row sums to 1
-    #     soft_permutation_matrix = F.softmax(self.weights, dim=1)
-    #     x_reordered = torch.matmul(soft_permutation_matrix, x.unsqueeze(-1)).squeeze(-1)
-    #
-    #     # Reshape x_reordered for convolution
-    #     # Here you need to ensure the total dimensions match the reshaped dimensions
-    #     x = x_reordered.view(-1, 1, 130, 4)  # Batch size, Channels, Height, Width
-    #
-    #     # Convolutional layers with activation and pooling
-    #     x = F.relu(self.conv1(x))
-    #
-    #     # Flatten the output for the fully connected layer
-    #     x = torch.flatten(x, 1)
-    #
-    #     # Fully connected layers
-    #     x = F.relu(self.fc1(x))
-    #     x = self.fc2(x)
-    #
-    #     return x
-
-
-
 
     def _preprocess(self, x, y, valid_x, valid_y):
         #self.normY = data_helper_413.NormY()
@@ -200,7 +184,7 @@ if __name__ == '__main__':
     # Setup
 
     num_epochs = 200
-    learning_rate = 0.0002
+    learning_rate = 0.000008
 
     # Assuming data_helper functions and filter_building return appropriate numpy arrays
     nn_model = NN()
